@@ -3,7 +3,10 @@ from dataclasses import dataclass
 import glob
 import os
 from pathlib import Path
+import numpy as np
 import pandas as pd
+from colorama import Fore, Style
+
 
 EXIT_SUCCESS = 0
 EXIT_FAILED = 1
@@ -33,23 +36,12 @@ class Filename :
 class Document :
 
     def __init__(self) -> None:
-        self.Strang1Path = "../Strang1/xls/"
-        self.Strang2Path = "../Strang2/xls/"
-        self.Strang3Path = "../Strang3/xls/"
-        self.Buffer = []
-        
-    """       
-    def create_textfile(self) -> int:
-        try:
-            self.missing_ref_textfile = "../output/missing.txt"
-            myFile = open(self.missing_ref_textfile, "w+", encoding="UTF-8")
-            myFile.close()
+        current_script_dir = Path(__file__).parent
+        self.Strang1Path = current_script_dir.parent / "Strang1/xls/"
+        self.Strang2Path = current_script_dir.parent / "Strang2/xls/"
+        self.Strang3Path = current_script_dir.parent / "Strang3/xls/"
+        #self.Buffer = [[0] * 5 for _ in range(10)]
 
-            return EXIT_SUCCESS
-        except:
-            print("Error : creating text file\n")
-            return EXIT_FAILED
-    """
 
     def create_textfile(self) -> int:
         try:
@@ -78,7 +70,7 @@ class Document :
     def write_missing_ref(self, filename, numero) -> int:
         try:
             with open(self.missing_ref_textfile, "a") as myFile:
-                myFile.write("Ref missing : " + filename + f" in file {numero}\n")
+                myFile.write("Ref missing : " + filename.split('\\')[-1] + f" in file {numero}\n")
 
             return EXIT_SUCCESS
         except:
@@ -89,9 +81,9 @@ class Document :
     def parse_name(self, name) -> int:
         try:
             lst = name.split("_")
-            Filename.number = lst[1]
+            Filename.number = lst[-2]
             Filename.filename = name
-            Filename.serialNumber = (lst[2])[2:-4:]
+            Filename.serialNumber = (lst[-1])[2:-4:]
         except:
             print("Error parsing name")
             return EXIT_FAILED
@@ -112,8 +104,11 @@ class Document :
         Retourne le chemin local du fichier
         """
         pattern = Filename.serialNumber
-        fichiers = [f for f in glob.glob(chemin + '/*') if f.endswith('.xls') and pattern in os.path.basename(f)]
-        
+        number = Filename.number
+        #fichiers = [f for f in glob.glob(chemin + '/*') if f.endswith('.xls') and pattern in os.path.basename(f)]
+
+        fichiers = [str(f) for f in chemin.glob('*.xls') if (pattern in f.name and number in f.name) ]
+
         if(len(fichiers) > 1):
             print(f"Multiple files found in dir : {chemin}")
         if(len(fichiers) == 0):
@@ -126,14 +121,13 @@ class Document :
         Lit le fichier 1 et remplit le buffer avec les cellules I5 à L13
         """
         # Charger le fichier XLS
-        df = pd.read_excel(chemin, header=None)
+        df = pd.read_excel(chemin, usecols='I:L', skiprows=4, header=None)
 
         # Sélectionner les données entre les cases I5 à L13
-        self.Buffer = df.iloc[4:13, 8:12]
-
+        self.Buffer = pd.DataFrame(data=df.values)
         return EXIT_SUCCESS
 
-
+    """
     def write_buffer_to_file(self, chemin) -> int:
         # Charger le fichier XLS
         df = pd.read_excel(chemin, header=None)
@@ -143,13 +137,27 @@ class Document :
         df.to_excel(chemin, index=False)
 
         return EXIT_SUCCESS
+    """
+    def write_buffer_to_file(self, chemin) -> int:
+        try:            
+
+    
+
+            # Ecrire le Buffer sur les cases I5 à L13
+            #df.iloc[4:13, 8:12] = self.Buffer
+
+            # Sauvegarder le DataFrame modifié dans le même fichier
+            self.Buffer.to_excel(chemin, index=False, header=False, startrow=4, startcol=8)
+            return EXIT_SUCCESS
+
+        except Exception as e:
+            print(f"Error: {e}")
+            return EXIT_FAILED
 
 
 
-    def read_dir(self):
-        for file in os.listdir(self.Strang1Path):
-            if file.endswith(".xls"):
-                pass
+    
+        
 
 
 
@@ -157,54 +165,76 @@ if(__name__ == "__main__"):
 
     # variable de vérification
     retour = 0
+    def test_retour(retour, message, failed) -> None:
+        if(retour == EXIT_SUCCESS):
+            print(Fore.GREEN + f'Success : {message}' + Style.RESET_ALL)
+        else:
+            print(Fore.RED + f"Erreur : {failed}" + Style.RESET_ALL)
     
     document = Document()
 
     # Création du fichier texte missing file
-    document.create_textfile()
+    retour = document.create_textfile()
+    test_retour(retour, "Création du fichier texte", "Création du fichier texte")
+
+    nameXLS = ""
+
+    
+
+    def traitement() -> None:
+        #récupérer les infos fichier 1
+        retour = document.parse_name(nameXLS)
+        if(retour == EXIT_SUCCESS):
+            print("\n|===================================|")
+            print(Fore.BLUE + f"Doc : {nameXLS}\n" + Style.RESET_ALL)
+            #document.display_info()
+
+        #chercher fichier 2
+        file2Path = document.search_file(document.Strang2Path)
+
+        #chercher fichier 3
+        file3Path = document.search_file(document.Strang3Path)
+
+        if(file2Path != [] and file3Path != []):
+            #remplir buffer avec fichier 1
+            retour = document.fill_buffer(str(document.Strang1Path / Filename.filename))
+            test_retour(retour, "filling buffer", "Error : filling buffer")
+
+            #remplir les fichiers 2 et 3 avec le buffer
+            retour = document.write_buffer_to_file(file2Path)
+            test_retour(retour, "buffer writed to file 2", "Error : writing buffer")
+
+            retour = document.write_buffer_to_file(file3Path)
+            test_retour(retour, "buffer writed to file 3", "Error : writing buffer")
+
+        else:
+            print(Fore.RED + "\nErreur : fichiers 2 ou 3 non trouvés" + Style.RESET_ALL)
+            print("|__fichier 2 : ", file2Path)
+            print("|__fichier 3 : ", file3Path)
+
+            if(file2Path == []):
+                document.write_missing_ref(nameXLS, 2)
+            if(file3Path == []):
+                document.write_missing_ref(nameXLS, 3)
+
+            exit()
 
 
-    nameXLS = "filename_01_11BEOX12.xls"
 
-    #récupérer les infos fichier 1
-    if(document.parse_name(nameXLS)):
-        print(f"Doc : {nameXLS}\n")
-        document.display_info()
+    for file in os.listdir(document.Strang1Path):
+            if file.endswith(".xls"):
+                #nameXLS = "filename_01_11BEOX12.xls"
+                nameXLS = os.path.join(document.Strang1Path, file)
+                traitement()
 
-    #chercher fichier 2
-    file2Path = document.search_file(document.Strang2Path)
 
-    #chercher fichier 3
-    file3Path = document.search_file(document.Strang3Path)
-
-    if(file2Path != [] and file3Path != []):
-        #remplir buffer avec fichier 1
-        document.fill_buffer(document.Strang1Path + "/" + Filename.filename)
-
-        #remplir les fichiers 2 et 3 avec le buffer
-        document.write_buffer_to_file(file2Path)
-        document.write_buffer_to_file(file3Path)
-
-    else:
-        print("\nErreur : fichiers 2 ou 3 non trouvé\n")
-        print("|__fichier 2 : ", file2Path)
-        print("|__fichier 3 : ", file3Path)
-
-        if(file2Path == []):
-            document.write_missing_ref(nameXLS, 2)
-        if(file3Path == []):
-            document.write_missing_ref(nameXLS, 3)
-
-        exit()
-
+            
 
         
 
-    
 
 
 
-
-    
-    
+        
+        
 
