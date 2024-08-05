@@ -2,6 +2,7 @@
 from dataclasses import dataclass
 import glob
 import os
+from pathlib import Path
 import pandas as pd
 
 EXIT_SUCCESS = 0
@@ -37,23 +38,47 @@ class Document :
         self.Strang3Path = "../Strang3/xls/"
         self.Buffer = []
         
-        
+    """       
     def create_textfile(self) -> int:
         try:
             self.missing_ref_textfile = "../output/missing.txt"
-            myFile = open(self.missing_ref_textfile, "w+")
+            myFile = open(self.missing_ref_textfile, "w+", encoding="UTF-8")
             myFile.close()
 
             return EXIT_SUCCESS
         except:
             print("Error : creating text file\n")
             return EXIT_FAILED
+    """
+
+    def create_textfile(self) -> int:
+        try:
+            # Obtenez le répertoire du script actuel
+            current_script_dir = Path(__file__).parent
+            
+            # Construisez le chemin du dossier cible
+            output_dir = current_script_dir.parent / "output"
+            
+            # Assurez-vous que le dossier cible existe
+            output_dir.mkdir(parents=True, exist_ok=True)
+            
+            # Chemin complet du fichier à créer
+            self.missing_ref_textfile = output_dir / "missing.txt"
+            
+            # Créez le fichier (ou ouvrez-le s'il existe déjà) avec la méthode 'with'
+            with open(self.missing_ref_textfile, "w+", encoding="UTF-8") as myFile:
+                pass
+            
+            return EXIT_SUCCESS
+        except Exception as e:
+            print(f"Error: creating text file - {e}")
+            return EXIT_FAILED
 
 
-    def write_missing_ref(self, filename) -> int:
+    def write_missing_ref(self, filename, numero) -> int:
         try:
             with open(self.missing_ref_textfile, "a") as myFile:
-                myFile.write(filename + "\n")
+                myFile.write("Ref missing : " + filename + f" in file {numero}\n")
 
             return EXIT_SUCCESS
         except:
@@ -132,9 +157,13 @@ if(__name__ == "__main__"):
 
     # variable de vérification
     retour = 0
-
-    document = Document()
     
+    document = Document()
+
+    # Création du fichier texte missing file
+    document.create_textfile()
+
+
     nameXLS = "filename_01_11BEOX12.xls"
 
     #récupérer les infos fichier 1
@@ -151,15 +180,30 @@ if(__name__ == "__main__"):
     if(file2Path != [] and file3Path != []):
         #remplir buffer avec fichier 1
         document.fill_buffer(document.Strang1Path + "/" + Filename.filename)
+
+        #remplir les fichiers 2 et 3 avec le buffer
+        document.write_buffer_to_file(file2Path)
+        document.write_buffer_to_file(file3Path)
+
     else:
         print("\nErreur : fichiers 2 ou 3 non trouvé\n")
         print("|__fichier 2 : ", file2Path)
         print("|__fichier 3 : ", file3Path)
+
+        if(file2Path == []):
+            document.write_missing_ref(nameXLS, 2)
+        if(file3Path == []):
+            document.write_missing_ref(nameXLS, 3)
+
         exit()
+
+
         
 
-    #remplir les fichiers 2 et 3 avec le buffer
-    document.write_buffer_to_file(file2Path)
+    
+
+
+
 
     
     
