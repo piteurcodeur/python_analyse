@@ -4,9 +4,12 @@ import glob
 import os
 from pathlib import Path
 import numpy as np
+from openpyxl import load_workbook
 import pandas as pd
 from colorama import Fore, Style
-
+import xlrd
+import xlwt
+from xlutils.copy import copy
 
 EXIT_SUCCESS = 0
 EXIT_FAILED = 1
@@ -83,7 +86,7 @@ class Document :
             lst = name.split("_")
             Filename.number = lst[-2]
             Filename.filename = name
-            Filename.serialNumber = (lst[-1])[2:-4:]
+            Filename.serialNumber = (lst[-1])[:-4][-4:]
         except:
             print("Error parsing name")
             return EXIT_FAILED
@@ -121,7 +124,7 @@ class Document :
         Lit le fichier 1 et remplit le buffer avec les cellules I5 à L13
         """
         # Charger le fichier XLS
-        df = pd.read_excel(chemin, usecols='I:L', skiprows=4, header=None)
+        df = pd.read_excel(chemin, usecols='I:', skiprows=4, header=None, engine='xlrd')
 
         # Sélectionner les données entre les cases I5 à L13
         self.Buffer = pd.DataFrame(data=df.values)
@@ -137,7 +140,9 @@ class Document :
         df.to_excel(chemin, index=False)
 
         return EXIT_SUCCESS
-    """
+    
+
+    
     def write_buffer_to_file(self, chemin) -> int:
         try:            
 
@@ -147,15 +152,42 @@ class Document :
             #df.iloc[4:13, 8:12] = self.Buffer
 
             # Sauvegarder le DataFrame modifié dans le même fichier
-            self.Buffer.to_excel(chemin, index=False, header=False, startrow=4, startcol=8)
+            self.Buffer.to_excel(chemin, index=False, header=False, startrow=4, engine='xlwt')
+            #, startcol=8
             return EXIT_SUCCESS
 
         except Exception as e:
             print(f"Error: {e}")
             return EXIT_FAILED
+        """
+    
 
+    def write_buffer_to_file(self, chemin) -> int:
+        try:
+            
+            # Open the existing file
+            rb = xlrd.open_workbook(chemin, formatting_info=True)
 
+            # Create a copy of the workbook
+            wb = copy(rb)
 
+            # Get the first sheet
+            sheet = wb.get_sheet(0)
+
+            # Write the Buffer to the specified cells
+            for i in range(5, 14):
+                for j in range(8, 12):
+                    sheet.write(i, j, self.Buffer.iat[i - 5, j - 8])
+
+            # Save the workbook to the specified file
+            wb.save(chemin)
+
+            return EXIT_SUCCESS
+
+        except Exception as e:
+            print(chemin)
+            print(f"Error: {e}")
+            return EXIT_FAILED
     
         
 
@@ -187,7 +219,7 @@ if(__name__ == "__main__"):
         if(retour == EXIT_SUCCESS):
             print("\n|===================================|")
             print(Fore.BLUE + f"Doc : {nameXLS}\n" + Style.RESET_ALL)
-            #document.display_info()
+            document.display_info()
 
         #chercher fichier 2
         file2Path = document.search_file(document.Strang2Path)
@@ -206,7 +238,8 @@ if(__name__ == "__main__"):
 
             retour = document.write_buffer_to_file(file3Path)
             test_retour(retour, "buffer writed to file 3", "Error : writing buffer")
-
+            return EXIT_SUCCESS
+        
         else:
             print(Fore.RED + "\nErreur : fichiers 2 ou 3 non trouvés" + Style.RESET_ALL)
             print("|__fichier 2 : ", file2Path)
@@ -217,7 +250,7 @@ if(__name__ == "__main__"):
             if(file3Path == []):
                 document.write_missing_ref(nameXLS, 3)
 
-            exit()
+            return EXIT_FAILED
 
 
 
