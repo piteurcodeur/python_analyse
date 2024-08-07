@@ -5,11 +5,11 @@ import os
 from pathlib import Path
 import numpy as np
 from openpyxl import load_workbook
+import openpyxl
 import pandas as pd
 from colorama import Fore, Style
 import xlrd
 import xlwt
-from xlutils.copy import copy
 
 EXIT_SUCCESS = 0
 EXIT_FAILED = 1
@@ -18,8 +18,8 @@ EXIT_FAILED = 1
 
 1) lire le fichier 1
 2) chercher le fichier 2 et 3
-3) si fichiers 2 et 3 existent : remplir le buffer avec fichier 1
-4) ecrire fichiers 2 et 3
+3) si fichiers 2 et 3 existent : remplir le buffer avec le tableau du fichier 1
+4) copier les fichiers 2 et 3 vers un buffer -> ecrire dans un fichier xlsx + ecrire le tableau buffer -> convertir en xls
 5) sinon ecire le nom dans missing file txt
 
 
@@ -188,6 +188,54 @@ class Document :
             print(chemin)
             print(f"Error: {e}")
             return EXIT_FAILED
+        
+
+    def convert_xlsx_to_xls(self, xlsx_path, xls_path) -> int:
+        try:
+            # Load the .xlsx file
+            workbook_xlsx = openpyxl.load_workbook(xlsx_path)
+            sheet_xlsx = workbook_xlsx.active
+
+            # Create a new .xls file
+            workbook_xls = xlwt.Workbook()
+            sheet_xls = workbook_xls.add_sheet(sheet_xlsx.title)
+
+            # Copy data from the .xlsx file to the .xls file
+            for row_index, row in enumerate(sheet_xlsx.iter_rows()):
+                for col_index, cell in enumerate(row):
+                    sheet_xls.write(row_index, col_index, cell.value)
+
+            # Save the .xls file
+            workbook_xls.save(xls_path)
+            
+        except:
+
+            return EXIT_FAILED
+        return EXIT_SUCCESS
+    
+
+    def convert_xls_to_xlsx(self, xls_path, xlsx_path) -> int:
+        try:
+            # Load the .xls file
+            workbook_xls = xlrd.open_workbook(xls_path)
+            sheet_xls = workbook_xls.sheet_by_index(0)
+            
+            # Create a new .xlsx file
+            workbook_xlsx = openpyxl.Workbook()
+            sheet_xlsx = workbook_xlsx.active
+            sheet_xlsx.title = sheet_xls.name
+            
+            # Copy data from the .xls file to the .xlsx file
+            for row_index in range(sheet_xls.nrows):
+                for col_index in range(sheet_xls.ncols):
+                    cell_value = sheet_xls.cell_value(row_index, col_index)
+                    sheet_xlsx.cell(row=row_index + 1, column=col_index + 1, value=cell_value)
+            
+            # Save the .xlsx file
+            workbook_xlsx.save(xlsx_path)
+        except:
+            return EXIT_FAILED
+        return EXIT_SUCCESS
     
         
 
